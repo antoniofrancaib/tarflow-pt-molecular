@@ -1,0 +1,84 @@
+# =============================================================================
+# 🎯 MINIMALISTIC NORMALIZING FLOWS CONFIGURATION
+# =============================================================================
+
+# Default experiment settings
+default:
+  target: "two_moons"           # Options: two_moons, checkerboard
+  base: "gaussian"              # Options: gaussian, gaussian_trainable
+  model: "simple"               # Options: simple, transformer
+  
+  training:
+    epochs: 3000
+    batch_size: 512
+    learning_rate: 1.0e-3
+    eval_interval: 300
+    
+  model_params:
+    hidden_dim: 128
+    num_layers: 6
+    
+  visualization:
+    domain: 3.5                 # Plot domain: [-domain, domain] x [-domain, domain]
+    resolution: 100
+
+# =============================================================================
+# 🎨 PRESET CONFIGURATIONS
+# =============================================================================
+
+presets:
+  quick_test:
+    target: "two_moons"
+    model: "simple"
+    training:
+      epochs: 500
+      batch_size: 256
+    model_params:
+      hidden_dim: 64
+      num_layers: 4
+      
+  two_moons:
+    target: "two_moons"
+    model: "simple"
+    training:
+      epochs: 2000
+      learning_rate: 5.0e-4
+    model_params:
+      hidden_dim: 64
+      num_layers: 4
+    visualization:
+      domain: 4.0
+      
+  checkerboard:
+    target: "checkerboard"
+    model: "simple"
+    training:
+      epochs: 3000
+      batch_size: 512
+    model_params:
+      hidden_dim: 128
+      num_layers: 6
+      
+  checkerboard_hard:
+    target: "checkerboard"
+    model: "transformer"
+    training:
+      epochs: 4000
+      learning_rate: 8.0e-4
+    model_params:
+      hidden_dim: 96
+      num_layers: 8
+
+# =============================================================================
+# 🔧 DISTRIBUTION PARAMETERS (Advanced Users Only)
+# =============================================================================
+
+distributions:
+  checkerboard:
+    grid_size: 8
+    domain_size: 3.0
+    high_density: 1.0
+    low_density: 0.1
+    
+  transformer:
+    transformer_layers: 2
