@@ -152,3 +152,6 @@ datasets/
 
 # macOS
 .DS_Store
+
+# Project-specific exclusions
+accelmd/
