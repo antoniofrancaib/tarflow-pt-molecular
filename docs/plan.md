@@ -7,6 +7,7 @@ Build *transferable* autoregressive normalizing flows for cross-temperature tran
 - [x] **2D Autoregressive Flows**: Validated on Two Moons and Checkerboard distributions
 
 ## **Current Phase** 🔄
+- [ ] **High-Dimensional Extension**: Scale transformer flows to 10D→50D→100D with meaningful validation
 - [ ] **Cross-Temperature Flow**: Learn T_θ: P_βk → P_βk+1 mapping for dipeptide PT data
 
 ## **Next Phases** 📋

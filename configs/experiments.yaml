@@ -82,3 +82,93 @@ distributions:
     
   transformer:
     transformer_layers: 2
+
+# =============================================================================
+# 🧬 MOLECULAR PARALLEL TEMPERING CONFIGURATIONS
+# =============================================================================
+
+molecular_pt:
+  # Default 300K → 450K transport
+  aa_300_450:
+    data_path: "datasets/AA/pt_AA.pt"
+    source_temp_idx: 0  # 300K
+    target_temp_idx: 1  # 450K
+    pdb_path: "datasets/AA/ref.pdb"
+    
+    model: "scalable_transformer"
+    use_energy: true  # Use OpenMM energy evaluation
+    
+    training:
+      epochs: 3000
+      batch_size: 256
+      learning_rate: 5.0e-4
+      eval_interval: 100
+      weight_decay: 1.0e-5
+    
+    model_params:
+      num_flow_layers: 8
+      embed_dim: 192
+      num_heads: 8
+      num_transformer_layers: 5
+      dropout: 0.1
+    
+    normalization:
+      mode: "per_atom"  # or "global"
+    
+  # Higher temperature gap: 300K → 670K
+  aa_300_670:
+    data_path: "datasets/AA/pt_AA.pt"
+    source_temp_idx: 0  # 300K
+    target_temp_idx: 2  # 670K
+    pdb_path: "datasets/AA/ref.pdb"
+    
+    model: "scalable_transformer"
+    use_energy: true
+    
+    training:
+      epochs: 5000
+      batch_size: 256
+      learning_rate: 3.0e-4
+      eval_interval: 150
+      weight_decay: 1.0e-5
+    
+    model_params:
+      num_flow_layers: 10
+      embed_dim: 256
+      num_heads: 8
+      num_transformer_layers: 6
+      dropout: 0.15
+    
+    normalization:
+      mode: "per_atom"
+  
+  # Maximum gap: 300K → 1000K
+  aa_300_1000:
+    data_path: "datasets/AA/pt_AA.pt"
+    source_temp_idx: 0  # 300K
+    target_temp_idx: 3  # 1000K
+    pdb_path: "datasets/AA/ref.pdb"
+    
+    model: "scalable_transformer"
+    use_energy: true
+    
+    training:
+      epochs: 6000
+      batch_size: 256
+      learning_rate: 2.0e-4
+      eval_interval: 200
+      weight_decay: 1.0e-5
+    
+    model_params:
+      num_flow_layers: 12
+      embed_dim: 320
+      num_heads: 8
+      num_transformer_layers: 8
+      dropout: 0.2
+    
+    normalization:
+      mode: "per_atom"
+
+# Temperature ladder for PT
+temperatures:
+  values: [300.0, 450.0, 670.0, 1000.0]

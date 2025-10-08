@@ -1,0 +1,172 @@
+# =============================================================================
+# 🎯 HIGH-DIMENSIONAL AUTOREGRESSIVE FLOW EXPERIMENTS
+# =============================================================================
+
+# Default experiment settings for high-dimensional flows
+default_high_dim:
+  base: "gaussian"
+  model: "scalable_transformer"
+  
+  training:
+    batch_size: 256
+    eval_interval: 200
+    weight_decay: 1.0e-4
+    
+  model_params:
+    num_flow_layers: 6
+    embed_dim: 128
+    num_heads: 8
+    num_transformer_layers: 4
+    dropout: 0.1
+    
+  visualization:
+    resolution: 100
+    eval_samples: 2000
+
+# =============================================================================
+# 🎨 HIGH-DIMENSIONAL PRESET CONFIGURATIONS
+# =============================================================================
+
+high_dim_presets:
+  # 10D: Proof of concept
+  10d_gaussian_to_mixture:
+    target: "high_dim_gaussian_mixture"
+    source: "high_dim_gaussian"
+    
+    target_params:
+      dim: 10
+      num_components: 4
+      separation: 3.0
+      component_std: 0.8
+      correlation_strength: 0.3
+      
+    source_params:
+      dim: 10
+      num_components: 1
+      separation: 0.0
+      component_std: 1.0
+      correlation_strength: 0.0
+      
+    training:
+      epochs: 2000
+      learning_rate: 1.0e-3
+      batch_size: 512
+      
+    model_params:
+      num_flow_layers: 4
+      embed_dim: 64
+      num_heads: 8
+      num_transformer_layers: 3
+      dropout: 0.1
+      
+  # 25D: Correlation learning
+  25d_uncorr_to_corr:
+    target: "high_dim_gaussian_mixture"
+    source: "high_dim_gaussian_mixture"
+    
+    target_params:
+      dim: 25
+      num_components: 3
+      separation: 2.5
+      component_std: 0.7
+      correlation_strength: 0.7
+      
+    source_params:
+      dim: 25
+      num_components: 2
+      separation: 2.0
+      component_std: 1.0
+      correlation_strength: 0.0
+      
+    training:
+      epochs: 3000
+      learning_rate: 8.0e-4
+      batch_size: 384
+      
+    model_params:
+      num_flow_layers: 6
+      embed_dim: 96
+      num_heads: 8
+      num_transformer_layers: 4
+      dropout: 0.1
+      
+  # 50D: Manifold learning
+  50d_gaussian_to_manifold:
+    target: "high_dim_swiss_roll"
+    source: "high_dim_gaussian"
+    
+    target_params:
+      dim: 50
+      intrinsic_dim: 3
+      noise_level: 0.2
+      roll_params:
+        length: 5.0
+        width: 3.0
+        turns: 2.0
+        
+    source_params:
+      dim: 50
+      num_components: 1
+      separation: 0.0
+      component_std: 1.5
+      correlation_strength: 0.1
+      
+    training:
+      epochs: 4000
+      learning_rate: 5.0e-4
+      batch_size: 256
+      
+    model_params:
+      num_flow_layers: 8
+      embed_dim: 128
+      num_heads: 8
+      num_transformer_layers: 4
+      dropout: 0.15
+      
+  # 100D: Ultimate challenge
+  100d_simple_to_complex:
+    target: "high_dim_gaussian_mixture"
+    source: "high_dim_gaussian_mixture"
+    
+    target_params:
+      dim: 100
+      num_components: 6
+      separation: 2.8
+      component_std: 0.6
+      correlation_strength: 0.5
+      
+    source_params:
+      dim: 100
+      num_components: 2
+      separation: 2.0
+      component_std: 1.0
+      correlation_strength: 0.2
+      
+    training:
+      epochs: 5000
+      learning_rate: 3.0e-4
+      batch_size: 128
+      
+    model_params:
+      num_flow_layers: 10
+      embed_dim: 256
+      num_heads: 8
+      num_transformer_layers: 6
+      dropout: 0.2
+
+# =============================================================================
+# 🔧 DISTRIBUTION PARAMETERS
+# =============================================================================
+
+high_dim_distributions:
+  high_dim_gaussian_mixture:
+    # Parameters will be loaded from preset configs
+    pass
+    
+  high_dim_swiss_roll:
+    # Parameters will be loaded from preset configs
+    pass
+    
+  high_dim_gaussian:
+    # Simple high-dimensional Gaussian (effectively mixture with 1 component)
+    pass

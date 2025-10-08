@@ -1,21 +1,58 @@
-# Problem formulation — and a unifying lens for how models actually sample
+# Problem Formulation: The Generative Modeling Challenge
 
-We observe $x\in\mathcal{X}$ drawn from an unknown law $p_{\text{data}}$. A generative model specifies a family $p_\theta$ and a concrete sampler $\mathsf{Sample}_\theta$ that can emit $x\sim p_\theta$. Think of the object as $(p_\theta,\mathsf{Sample}_\theta)$.
+## The Fundamental Question
 
-Training fits $\theta$ by minimizing a divergence between $p_{\text{data}}$ and $p_\theta$. Maximum likelihood is
+Given finite observations $\{x_i\}_{i=1}^N$ sampled from some unknown distribution $p_{\text{data}}(x)$ over space $\mathcal{X}$, can we build a computational procedure that generates new, realistic samples from this same distribution?
+
+This is the **generative modeling problem**: learning to synthesize data that is indistinguishable from the training distribution, despite never having direct access to $p_{\text{data}}$ itself.
+
+## Why This Matters
+
+The ability to generate realistic data is fundamental to understanding complex systems:
+- **Scientific modeling**: Simulating molecular conformations, weather patterns, or economic scenarios
+- **Creative synthesis**: Generating text, images, music, or code
+- **Data augmentation**: Creating training examples for downstream tasks
+- **Uncertainty quantification**: Understanding the space of plausible outcomes
+
+## The Mathematical Framework
+
+A generative model consists of two coupled components:
+
+1. **Density model**: A parametric family $p_\theta(x)$ that approximates $p_{\text{data}}(x)$
+2. **Sampling mechanism**: A procedure $\mathsf{Sample}_\theta$ that can draw $x \sim p_\theta$
+
+The generative model is the pair $(p_\theta, \mathsf{Sample}_\theta)$.
+
+### Training: Learning the Distribution
+
+We fit parameters $\theta$ by minimizing a divergence between $p_{\text{data}}$ and $p_\theta$. Maximum likelihood estimation targets:
 
 $$
-\theta^\star \in \arg\min_\theta
-\mathrm{KL}\big(p_{\text{data}} \,|\, p_\theta\big)
-= \arg\min_\theta
-\mathbb{E}_{x\sim p_{\text{data}}}\big[-\log p_\theta(x)\big].
+\theta^\star \in \arg\min_\theta \mathrm{KL}\big(p_{\text{data}} \,\|\, p_\theta\big) = \arg\min_\theta \mathbb{E}_{x \sim p_{\text{data}}}\big[-\log p_\theta(x)\big]
 $$
 
-Empirically, replace the expectation by the average over $\{x_i\}_{i=1}^N$.
+Empirically, this becomes minimizing negative log-likelihood over the dataset: $-\frac{1}{N}\sum_{i=1}^N \log p_\theta(x_i)$.
 
-Sampling is separate from likelihood. It is a **map** or a **Markov kernel**. Formally, $\mathsf{Sample}_\theta$ is either a measurable function $T_\theta$ with $x=T_\theta(z)$, $z\sim \mu$, or a transition law $K_\theta(\cdot\mid\cdot)$ that evolves a chain to stationarity.
+### The Sampling-Likelihood Duality
 
-This separation matters because families mostly differ in the **sampling operator**. Four mechanisms cover modern practice: **factorize**, **transform**, **evolve**, **shape**. Each gives a distinct training loss and runtime profile.
+Here lies the central tension: **sampling and likelihood evaluation are dual computational problems**. 
+
+If we can efficiently sample from $p_\theta$, computing $p_\theta(x)$ is generally hard. If we can tractably evaluate $p_\theta(x)$, sampling is often expensive. This duality forces fundamental trade-offs.
+
+Formally, $\mathsf{Sample}_\theta$ is either:
+- A **deterministic map**: $x = T_\theta(z)$ where $z \sim \mu$ (simple base distribution)
+- A **stochastic process**: Markov kernel $K_\theta(x' \mid x)$ that converges to $p_\theta$
+
+## The Four Fundamental Mechanisms
+
+All modern generative models resolve the sampling-likelihood tension through one of four core mechanisms. Each embodies a different computational philosophy:
+
+**Factorize** → Sequential decomposition via chain rule  
+**Transform** → Invertible coordinate changes  
+**Evolve** → Stochastic dynamics over time  
+**Shape** → Energy landscapes with equilibrium sampling  
+
+Each mechanism induces distinct training objectives, computational profiles, and quality-efficiency trade-offs. The choice determines everything: from the loss function to the inference algorithm.
 
 ---
 
@@ -42,7 +79,7 @@ This gives exact NLL and calibrated perplexity, at the cost of $O(T)$ sampling l
 **Transform.** We learn a deterministic pushforward $x=T_\theta(z)$ from a simple base $z\sim \mu$. If $T_\theta$ is a diffeomorphism (flows/CNFs),
 
 $$
-\log p_\theta(x)=\log p_Z\big(T_\theta^{-1}(x)\big)+\log\big|\det J_{T_\theta^{-1}}(x)\big|.
+\log p_\theta(x)=\log \mu\big(T_\theta^{-1}(x)\big)+\log\big|\det J_{T_\theta^{-1}}(x)\big|.
 $$
 
 Training is exact MLE; sampling is one shot: draw $z$, compute $T_\theta(z)$.
@@ -107,6 +144,19 @@ often approximated by denoising objectives. Mixing time and partition functions 
 
 ---
 
-**Why this lens?** Because inference constraints pick the mechanism. Exact likelihoods favor factorize/transform; ultra-low latency favors one-shot transforms or distilled evolutions; top fidelity and flexible conditioning favor evolutions; unnormalized scientific targets favor shaping plus sampler dynamics.
+## The Unifying Perspective
 
-Formally, each mechanism chooses a **pushforward**: a triangular map (factorize), a diffeomorphism (transform), a time-indexed flow of measures $p_t$ (evolve), or an invariant kernel $K_\theta$ (shape). The rest—losses, compute, and quality–latency trade-offs—fall out of that choice.
+Each mechanism is fundamentally a different **pushforward strategy**—a way to transport probability mass from a simple space where sampling is trivial to the complex data space:
+
+- **Factorize**: Triangular transport via sequential conditioning
+- **Transform**: Direct diffeomorphic pushforward  
+- **Evolve**: Time-indexed stochastic transport
+- **Shape**: Stationary distribution of ergodic dynamics
+
+The computational trade-offs emerge naturally:
+- **Exact likelihoods** → factorize/transform
+- **Ultra-low latency** → one-shot transforms or distilled flows  
+- **Highest fidelity** → evolution-based methods
+- **Unnormalized targets** → energy-based shaping
+
+This taxonomy is exhaustive: every modern generative model implements one of these four transport mechanisms, and each mechanism uniquely determines the training objective, sampling procedure, and computational characteristics.

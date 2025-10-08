@@ -132,15 +132,16 @@ dmypy.json
 *.pt
 *.pth
 
-# Checkpoints
-checkpoints/
 
 # Results and plots
 results/
 plots/
+plots_high_dim/
+results_high_dim/ 
+prompts.md
 
 # Dataset files (large files)
-datasets/
+more_data/
 *.npz
 *.png
 
