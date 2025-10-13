@@ -13,8 +13,11 @@ if torch.cuda.is_available():
 
 ### Cell 2: Clone Repository
 ```python
+# Clone and get latest changes
 !git clone https://github.com/antoniofrancaib/tarflow-pt-molecular.git
 %cd tarflow-pt-molecular
+!git pull origin main  # Ensure latest code with GPU preset
+
 !ls -lh datasets/AA/pt_AA.pt
 ```
 
