@@ -73,24 +73,32 @@ EOF
 
 ### Cell 5: Quick Training Test (100 epochs)
 ```python
-print("🚀 Quick training test (100 epochs, ~10 min)...")
+print("🚀 Quick training test (100 epochs, ~15 min)...")
+
+# Clear GPU cache first
+import torch
+torch.cuda.empty_cache()
 
 !$HOME/miniforge3/bin/python main.py train-molecular \
     --preset aa_300_450 \
     --epochs 100 \
-    --batch-size 256 \
+    --batch-size 64 \
     --validate
 ```
 
 ### Cell 6: Full Training (3000 epochs)
 ```python
-print("🚀 Full training (3000 epochs, ~2-3 hours)...")
+print("🚀 Full training (3000 epochs, ~3-4 hours)...")
+
+# Clear GPU cache first
+import torch
+torch.cuda.empty_cache()
 
 !$HOME/miniforge3/bin/python main.py train-molecular \
     --preset aa_300_450 \
     --epochs 3000 \
     --lr 5e-4 \
-    --batch-size 512 \
+    --batch-size 128 \
     --validate
 ```
 
@@ -129,9 +137,11 @@ print("✅ Download complete!")
 ## ⏱️ Time Estimates
 
 - Setup (Cells 1-4): ~3 minutes
-- Quick test (Cell 5): ~10 minutes
-- Full training (Cell 6): ~2-3 hours
+- Quick test (Cell 5): ~15 minutes
+- Full training (Cell 6): ~3-4 hours
 - Download: ~30 seconds
+
+**Note**: Batch sizes are optimized for T4 GPU (15GB). For larger GPUs (A100/V100), you can increase batch size.
 
 ---
 
@@ -141,10 +151,17 @@ print("✅ Download complete!")
 - Solution: Use `$HOME/miniforge3/bin/python` not just `python`
 
 **Issue: CUDA out of memory**
-- Solution: Reduce batch size to 128
+- Solution: The autoregressive inverse operation is memory-intensive. Try these in order:
+  1. Clear GPU cache: `torch.cuda.empty_cache()` before training
+  2. Reduce batch size: `--batch-size 32` or `--batch-size 16`
+  3. Restart runtime and run again (Runtime → Restart runtime)
+  4. Use gradient checkpointing (advanced, see code)
 
 **Issue: Training too slow**
 - Solution: Use T4 GPU or higher (Runtime → Change runtime type)
+- T4 (15GB): batch_size=64
+- V100 (16GB): batch_size=96
+- A100 (40GB): batch_size=256
 
 ---
 
