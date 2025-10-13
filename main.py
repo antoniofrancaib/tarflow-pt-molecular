@@ -538,6 +538,7 @@ def train_molecular_pt(args):
         use_energy_gating=config.get('use_energy_gating', True),
         E_cut=config.get('E_cut', 500.0),
         E_max=config.get('E_max', 10000.0),
+        logdet_clip=config.get('logdet_clip', 100.0),
     )
     
     # Train

@@ -133,11 +133,12 @@ molecular_pt:
     use_energy_gating: true  # ABLATION: Set false to disable
     E_cut: 500.0  # Soft regularization threshold (kJ/mol)
     E_max: 100000000.0  # Hard clamp threshold after warmup (100M kJ/mol)
+    logdet_clip: 100.0  # Clamp LogDet to prevent divergence
     
     training:
       epochs: 3000
       batch_size: 32  # Reduced for memory safety on T4
-      learning_rate: 5.0e-4
+      learning_rate: 1.0e-4  # Reduced from 5e-4 to prevent divergence
       eval_interval: 100
       weight_decay: 1.0e-5
       
@@ -150,7 +151,7 @@ molecular_pt:
       
       # Checkpointing (for ablation studies)
       save_best_model: true  # ABLATION: Set false to only save final model
-      gradient_clip_norm: 1.0  # Max gradient norm (set 0 to disable)
+      gradient_clip_norm: 0.5  # Max gradient norm (reduced for stability)
     
     model_params:
       num_flow_layers: 6  # Increased from 4 (was too small)

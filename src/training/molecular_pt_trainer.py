@@ -33,6 +33,7 @@ class MolecularPTTrainer:
         use_energy_gating: bool = True,
         E_cut: float = 500.0,
         E_max: float = 10000.0,
+        logdet_clip: float = 100.0,  # Prevent LogDet explosion
     ):
         """Initialize molecular PT trainer.
         
@@ -44,12 +45,14 @@ class MolecularPTTrainer:
             use_energy_gating: If True, apply energy regularization for stability
             E_cut: Soft energy regularization threshold (kJ/mol)
             E_max: Hard energy clamp threshold (kJ/mol)
+            logdet_clip: Max absolute value for log determinant (prevents divergence)
         """
         self.model = model.to(device)
         self.dataset = dataset
         self.device = device
         self.use_energy = use_energy
         self.use_energy_gating = use_energy_gating
+        self.logdet_clip = logdet_clip
         
         # Initialize energy gating
         if use_energy_gating:
@@ -116,14 +119,16 @@ class MolecularPTTrainer:
             energy_term = torch.tensor(0.0, device=x_source.device)
         
         # Jacobian term: -E[log|det J|] (negative because we want high Jacobian)
-        jacobian_term = -log_det_fwd.mean()
+        # Clamp log_det to prevent divergence
+        log_det_clamped = torch.clamp(log_det_fwd, min=-self.logdet_clip, max=self.logdet_clip)
+        jacobian_term = -log_det_clamped.mean()
         
         # Total forward loss
         loss = energy_term + jacobian_term
         
         metrics = {
             'fwd_energy': energy_term.item(),
-            'fwd_log_det': -jacobian_term.item(),  # Store actual log det
+            'fwd_log_det': -jacobian_term.item(),  # Store actual clamped log det
             'fwd_loss': loss.item(),
         }
         
@@ -171,14 +176,16 @@ class MolecularPTTrainer:
             energy_term = torch.tensor(0.0, device=x_target.device)
         
         # Jacobian term: -E[log|det J|]
-        jacobian_term = -log_det_inv.mean()
+        # Clamp log_det to prevent divergence
+        log_det_clamped = torch.clamp(log_det_inv, min=-self.logdet_clip, max=self.logdet_clip)
+        jacobian_term = -log_det_clamped.mean()
         
         # Total inverse loss
         loss = energy_term + jacobian_term
         
         metrics = {
             'inv_energy': energy_term.item(),
-            'inv_log_det': -jacobian_term.item(),
+            'inv_log_det': -jacobian_term.item(),  # Store actual clamped log det
             'inv_loss': loss.item(),
         }
         
