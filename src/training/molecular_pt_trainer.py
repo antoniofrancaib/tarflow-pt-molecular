@@ -226,9 +226,10 @@ class MolecularPTTrainer:
         # Total loss (sum of forward and inverse)
         total_loss = loss_fwd + loss_inv
         
-        # Backward pass with gradient clipping
+        # Backward pass with optional gradient clipping
         total_loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+        if hasattr(self, 'gradient_clip_norm') and self.gradient_clip_norm > 0:
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.gradient_clip_norm)
         optimizer.step()
         
         # Combine metrics
@@ -264,22 +265,38 @@ class MolecularPTTrainer:
         batch_size = training_config.get('batch_size', 256)
         learning_rate = training_config.get('learning_rate', 5e-4)
         eval_interval = training_config.get('eval_interval', 100)
+        weight_decay = training_config.get('weight_decay', 1e-5)
         
-        # Setup optimizer with warmup-friendly learning rate
+        # Ablation study parameters
+        use_warmup = training_config.get('use_warmup', True)
+        warmup_epochs = training_config.get('warmup_epochs', 50)
+        use_scheduler = training_config.get('use_scheduler', True)
+        scheduler_patience = training_config.get('scheduler_patience', 50)
+        scheduler_factor = training_config.get('scheduler_factor', 0.5)
+        save_best_model = training_config.get('save_best_model', True)
+        gradient_clip_norm = training_config.get('gradient_clip_norm', 1.0)
+        
+        # Setup optimizer
         optimizer = optim.Adam(
             self.model.parameters(),
             lr=learning_rate,
-            weight_decay=1e-5,
+            weight_decay=weight_decay,
         )
         
-        # Warmup scheduler: gradually increase LR for first 50 epochs
-        warmup_epochs = min(50, num_epochs // 20)
+        # Warmup scheduler (configurable)
+        if use_warmup:
+            warmup_epochs = min(warmup_epochs, num_epochs // 20)
+        else:
+            warmup_epochs = 0  # No warmup
         
-        # Main scheduler: reduce on plateau after warmup
-        # More aggressive: patience=50 catches divergence faster
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode='min', patience=50, factor=0.5, verbose=True
-        )
+        # Main scheduler (configurable)
+        if use_scheduler:
+            scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer, mode='min', patience=scheduler_patience, 
+                factor=scheduler_factor, verbose=True
+            )
+        else:
+            scheduler = None  # Constant LR
         
         # Training history
         history = []
@@ -288,21 +305,28 @@ class MolecularPTTrainer:
         patience_counter = 0
         skipped_batches_count = 0
         
+        # Store config for gradient clipping
+        self.gradient_clip_norm = gradient_clip_norm
+        
         print(f"\n{'='*70}")
         print(f"🧬 Molecular Cross-Temperature Transport Training")
         print(f"{'='*70}")
         print(f"Model: {config.get('model_type', 'ScalableTransformerFlow')}")
         print(f"Transport: {self.dataset.source_temp}K → {self.dataset.target_temp}K")
         print(f"Epochs: {num_epochs}, Batch size: {batch_size}, LR: {learning_rate}")
-        if self.use_energy_gating:
-            print(f"Energy gating: ENABLED")
+        print(f"\n🔧 Training Configuration:")
+        print(f"  Energy gating: {'ON' if self.use_energy_gating else 'OFF'}")
+        print(f"  LR warmup: {'ON' if use_warmup else 'OFF'} ({warmup_epochs} epochs)" if use_warmup else "  LR warmup: OFF")
+        print(f"  LR scheduler: {'ON' if use_scheduler else 'OFF'} (patience={scheduler_patience})" if use_scheduler else "  LR scheduler: OFF")
+        print(f"  Best model checkpointing: {'ON' if save_best_model else 'OFF'}")
+        print(f"  Gradient clipping: {gradient_clip_norm:.1f}" if gradient_clip_norm > 0 else "  Gradient clipping: OFF")
         print(f"{'='*70}\n")
         
         # Training loop with live metrics
         pbar = tqdm(range(num_epochs), desc="Training")
         for epoch in pbar:
-            # Learning rate warmup
-            if epoch < warmup_epochs:
+            # Learning rate warmup (if enabled)
+            if use_warmup and epoch < warmup_epochs:
                 warmup_factor = (epoch + 1) / warmup_epochs
                 for param_group in optimizer.param_groups:
                     param_group['lr'] = learning_rate * warmup_factor
@@ -314,8 +338,8 @@ class MolecularPTTrainer:
             if metrics.get('batch_skipped', False):
                 skipped_batches_count += 1
             
-            # Save best model checkpoint (only if batch not skipped)
-            if not metrics.get('batch_skipped', False) and metrics['total_loss'] < best_loss:
+            # Save best model checkpoint (only if enabled and batch not skipped)
+            if save_best_model and not metrics.get('batch_skipped', False) and metrics['total_loss'] < best_loss:
                 best_loss = metrics['total_loss']
                 best_epoch = epoch + 1
                 patience_counter = 0
@@ -325,8 +349,8 @@ class MolecularPTTrainer:
             else:
                 patience_counter += 1
             
-            # Learning rate scheduling (after warmup)
-            if epoch >= warmup_epochs:
+            # Learning rate scheduling (if enabled and after warmup)
+            if use_scheduler and scheduler is not None and epoch >= warmup_epochs:
                 scheduler.step(metrics['total_loss'])
             
             # Update progress bar with live metrics
@@ -366,8 +390,9 @@ class MolecularPTTrainer:
         model_path = os.path.join(save_dir, f"molecular_pt_{int(self.dataset.source_temp)}_{int(self.dataset.target_temp)}.pt")
         torch.save(self.model.state_dict(), model_path)
         print(f"\n✅ Final model saved: {model_path}")
-        print(f"✅ Best model saved: best_model_{int(self.dataset.source_temp)}_{int(self.dataset.target_temp)}.pt")
-        print(f"   Best loss: {best_loss:.4e} at epoch {best_epoch}")
+        if save_best_model:
+            print(f"✅ Best model saved: best_model_{int(self.dataset.source_temp)}_{int(self.dataset.target_temp)}.pt")
+            print(f"   Best loss: {best_loss:.4e} at epoch {best_epoch}")
         
         # Report energy gating statistics
         if self.use_energy_gating:

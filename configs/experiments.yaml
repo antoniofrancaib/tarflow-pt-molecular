@@ -128,7 +128,9 @@ molecular_pt:
     
     model: "scalable_transformer"
     use_energy: true
-    use_energy_gating: true  # Prevents gradient instability
+    
+    # Energy gating (for ablation studies)
+    use_energy_gating: true  # ABLATION: Set false to disable
     E_cut: 500.0  # Soft regularization threshold (kJ/mol)
     E_max: 10000.0  # Hard clamp threshold (kJ/mol)
     
@@ -138,6 +140,17 @@ molecular_pt:
       learning_rate: 5.0e-4
       eval_interval: 100
       weight_decay: 1.0e-5
+      
+      # Learning rate scheduling (for ablation studies)
+      use_warmup: true  # ABLATION: Set false to disable LR warmup
+      warmup_epochs: 50  # Number of warmup epochs
+      use_scheduler: true  # ABLATION: Set false for constant LR
+      scheduler_patience: 50  # Epochs before LR reduction
+      scheduler_factor: 0.5  # LR reduction factor
+      
+      # Checkpointing (for ablation studies)
+      save_best_model: true  # ABLATION: Set false to only save final model
+      gradient_clip_norm: 1.0  # Max gradient norm (set 0 to disable)
     
     model_params:
       num_flow_layers: 6  # Increased from 4 (was too small)
@@ -206,3 +219,197 @@ molecular_pt:
 # Temperature ladder for PT
 temperatures:
   values: [300.0, 450.0, 670.0, 1000.0]
+
+# =============================================================================
+# 🔬 ABLATION STUDY PRESETS
+# =============================================================================
+# Use these to systematically test which features help training
+
+ablation_studies:
+  # Baseline: ALL features enabled (best performance)
+  baseline_gpu:
+    data_path: "datasets/AA/pt_AA.pt"
+    source_temp_idx: 0
+    target_temp_idx: 1
+    pdb_path: "datasets/AA/ref.pdb"
+    model: "scalable_transformer"
+    use_energy: true
+    use_energy_gating: true
+    E_cut: 500.0
+    E_max: 10000.0
+    training:
+      epochs: 1500
+      batch_size: 64
+      learning_rate: 5.0e-4
+      eval_interval: 100
+      weight_decay: 1.0e-5
+      use_warmup: true
+      warmup_epochs: 50
+      use_scheduler: true
+      scheduler_patience: 50
+      scheduler_factor: 0.5
+      save_best_model: true
+      gradient_clip_norm: 1.0
+    model_params:
+      num_flow_layers: 6
+      embed_dim: 128
+      num_heads: 8
+      num_transformer_layers: 4
+      dropout: 0.1
+    normalization:
+      mode: "per_atom"
+  
+  # Ablation 1: No energy gating (test if gating helps)
+  no_energy_gating_gpu:
+    data_path: "datasets/AA/pt_AA.pt"
+    source_temp_idx: 0
+    target_temp_idx: 1
+    pdb_path: "datasets/AA/ref.pdb"
+    model: "scalable_transformer"
+    use_energy: true
+    use_energy_gating: false  # ABLATED
+    training:
+      epochs: 1500
+      batch_size: 64
+      learning_rate: 5.0e-4
+      eval_interval: 100
+      weight_decay: 1.0e-5
+      use_warmup: true
+      warmup_epochs: 50
+      use_scheduler: true
+      scheduler_patience: 50
+      scheduler_factor: 0.5
+      save_best_model: true
+      gradient_clip_norm: 1.0
+    model_params:
+      num_flow_layers: 6
+      embed_dim: 128
+      num_heads: 8
+      num_transformer_layers: 4
+      dropout: 0.1
+    normalization:
+      mode: "per_atom"
+  
+  # Ablation 2: No warmup (test if warmup helps)
+  no_warmup_gpu:
+    data_path: "datasets/AA/pt_AA.pt"
+    source_temp_idx: 0
+    target_temp_idx: 1
+    pdb_path: "datasets/AA/ref.pdb"
+    model: "scalable_transformer"
+    use_energy: true
+    use_energy_gating: true
+    E_cut: 500.0
+    E_max: 10000.0
+    training:
+      epochs: 1500
+      batch_size: 64
+      learning_rate: 5.0e-4
+      eval_interval: 100
+      weight_decay: 1.0e-5
+      use_warmup: false  # ABLATED
+      use_scheduler: true
+      scheduler_patience: 50
+      scheduler_factor: 0.5
+      save_best_model: true
+      gradient_clip_norm: 1.0
+    model_params:
+      num_flow_layers: 6
+      embed_dim: 128
+      num_heads: 8
+      num_transformer_layers: 4
+      dropout: 0.1
+    normalization:
+      mode: "per_atom"
+  
+  # Ablation 3: No scheduler (constant LR)
+  no_scheduler_gpu:
+    data_path: "datasets/AA/pt_AA.pt"
+    source_temp_idx: 0
+    target_temp_idx: 1
+    pdb_path: "datasets/AA/ref.pdb"
+    model: "scalable_transformer"
+    use_energy: true
+    use_energy_gating: true
+    E_cut: 500.0
+    E_max: 10000.0
+    training:
+      epochs: 1500
+      batch_size: 64
+      learning_rate: 5.0e-4
+      eval_interval: 100
+      weight_decay: 1.0e-5
+      use_warmup: true
+      warmup_epochs: 50
+      use_scheduler: false  # ABLATED
+      save_best_model: true
+      gradient_clip_norm: 1.0
+    model_params:
+      num_flow_layers: 6
+      embed_dim: 128
+      num_heads: 8
+      num_transformer_layers: 4
+      dropout: 0.1
+    normalization:
+      mode: "per_atom"
+  
+  # Ablation 4: No gradient clipping
+  no_grad_clip_gpu:
+    data_path: "datasets/AA/pt_AA.pt"
+    source_temp_idx: 0
+    target_temp_idx: 1
+    pdb_path: "datasets/AA/ref.pdb"
+    model: "scalable_transformer"
+    use_energy: true
+    use_energy_gating: true
+    E_cut: 500.0
+    E_max: 10000.0
+    training:
+      epochs: 1500
+      batch_size: 64
+      learning_rate: 5.0e-4
+      eval_interval: 100
+      weight_decay: 1.0e-5
+      use_warmup: true
+      warmup_epochs: 50
+      use_scheduler: true
+      scheduler_patience: 50
+      scheduler_factor: 0.5
+      save_best_model: true
+      gradient_clip_norm: 0.0  # ABLATED
+    model_params:
+      num_flow_layers: 6
+      embed_dim: 128
+      num_heads: 8
+      num_transformer_layers: 4
+      dropout: 0.1
+    normalization:
+      mode: "per_atom"
+  
+  # Ablation 5: Minimal (everything disabled except basics)
+  minimal_gpu:
+    data_path: "datasets/AA/pt_AA.pt"
+    source_temp_idx: 0
+    target_temp_idx: 1
+    pdb_path: "datasets/AA/ref.pdb"
+    model: "scalable_transformer"
+    use_energy: true
+    use_energy_gating: false  # ABLATED
+    training:
+      epochs: 1500
+      batch_size: 64
+      learning_rate: 5.0e-4
+      eval_interval: 100
+      weight_decay: 1.0e-5
+      use_warmup: false  # ABLATED
+      use_scheduler: false  # ABLATED
+      save_best_model: false  # ABLATED
+      gradient_clip_norm: 0.0  # ABLATED
+    model_params:
+      num_flow_layers: 6
+      embed_dim: 128
+      num_heads: 8
+      num_transformer_layers: 4
+      dropout: 0.1
+    normalization:
+      mode: "per_atom"

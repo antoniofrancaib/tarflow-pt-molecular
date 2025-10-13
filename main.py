@@ -466,13 +466,19 @@ def train_molecular_pt(args):
         print(f"❌ No molecular_pt configurations found in {config_file}")
         return
     
-    if args.preset not in config_data['molecular_pt']:
-        available = list(config_data['molecular_pt'].keys())
-        print(f"❌ Unknown molecular PT preset: {args.preset}")
-        print(f"Available presets: {available}")
+    # Check molecular_pt presets first, then ablation_studies
+    if args.preset in config_data.get('molecular_pt', {}):
+        config = config_data['molecular_pt'][args.preset]
+    elif args.preset in config_data.get('ablation_studies', {}):
+        config = config_data['ablation_studies'][args.preset]
+        print("🔬 Using ABLATION STUDY preset")
+    else:
+        available_pt = list(config_data.get('molecular_pt', {}).keys())
+        available_ablation = list(config_data.get('ablation_studies', {}).keys())
+        print(f"❌ Unknown preset: {args.preset}")
+        print(f"Available molecular_pt presets: {available_pt}")
+        print(f"Available ablation_studies presets: {available_ablation}")
         return
-    
-    config = config_data['molecular_pt'][args.preset]
     
     # Override config with command line arguments
     if args.epochs:
