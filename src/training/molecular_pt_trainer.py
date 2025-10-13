@@ -216,12 +216,16 @@ class MolecularPTTrainer:
         warmup_epochs = min(50, num_epochs // 20)
         
         # Main scheduler: reduce on plateau after warmup
+        # More aggressive: patience=50 catches divergence faster
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode='min', patience=200, factor=0.7, verbose=True
+            optimizer, mode='min', patience=50, factor=0.5, verbose=True
         )
         
         # Training history
         history = []
+        best_loss = float('inf')
+        best_epoch = 0
+        patience_counter = 0
         
         print(f"\n{'='*70}")
         print(f"🧬 Molecular Cross-Temperature Transport Training")
@@ -242,6 +246,17 @@ class MolecularPTTrainer:
             
             metrics = self.train_step(optimizer, batch_size)
             history.append(metrics)
+            
+            # Save best model checkpoint
+            if metrics['total_loss'] < best_loss:
+                best_loss = metrics['total_loss']
+                best_epoch = epoch + 1
+                patience_counter = 0
+                # Save best model
+                best_model_path = os.path.join(save_dir, f"best_model_{int(self.dataset.source_temp)}_{int(self.dataset.target_temp)}.pt")
+                torch.save(self.model.state_dict(), best_model_path)
+            else:
+                patience_counter += 1
             
             # Learning rate scheduling (after warmup)
             if epoch >= warmup_epochs:
@@ -273,13 +288,19 @@ class MolecularPTTrainer:
                 if epoch > 0 and 'initial_loss' in locals():
                     improvement = (initial_loss - metrics['total_loss']) / initial_loss * 100
                     print(f"  Improvement from start: {improvement:.1f}%")
+                    if metrics['total_loss'] == best_loss:
+                        print(f"  ⭐ New best loss! (saved checkpoint)")
+                    elif patience_counter > 10:
+                        print(f"  ⚠️  No improvement for {patience_counter} epochs")
                 elif epoch == 0:
                     initial_loss = metrics['total_loss']
         
         # Save final model
         model_path = os.path.join(save_dir, f"molecular_pt_{int(self.dataset.source_temp)}_{int(self.dataset.target_temp)}.pt")
         torch.save(self.model.state_dict(), model_path)
-        print(f"\n✅ Model saved: {model_path}")
+        print(f"\n✅ Final model saved: {model_path}")
+        print(f"✅ Best model saved: best_model_{int(self.dataset.source_temp)}_{int(self.dataset.target_temp)}.pt")
+        print(f"   Best loss: {best_loss:.4e} at epoch {best_epoch}")
         
         # Plot loss curves
         print(f"\n📊 Generating loss curve plots...")
