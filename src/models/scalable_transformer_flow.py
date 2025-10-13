@@ -260,6 +260,8 @@ class ScalableAutoregressiveFlowLayer(nn.Module):
     def inverse(self, z: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Inverse transformation (autoregressive sampling)
+        Memory-efficient version using pre-allocated tensor.
+        
         Args:
             z: latent tensor [batch_size, input_dim]
         Returns:
@@ -267,22 +269,19 @@ class ScalableAutoregressiveFlowLayer(nn.Module):
             log_det: log determinant of Jacobian
         """
         batch_size = z.shape[0]
-        x_components = []  # Collect components to avoid in-place operations
+        # Pre-allocate output tensor (more memory efficient than list + cat)
+        x = torch.zeros_like(z)
         log_det_total = torch.zeros(batch_size, device=z.device)
         
         # Sequentially reconstruct each dimension
         for i in range(self.input_dim):
             if i == 0:
-                # First dimension: no transformation
-                x_i = z[:, i:i+1]
-                x_components.append(x_i)
+                # First dimension: no transformation (direct copy, not in-place op on input)
+                x[:, 0] = z[:, 0]
             else:
-                # Build x from components collected so far
-                x_so_far = torch.cat(x_components, dim=1)
-                
                 # For dimension i, use previous dimensions x[:, :i]
-                # Embed previous dimensions
-                x_partial = x_so_far.unsqueeze(-1)  # [batch_size, i, 1]
+                # Create a NEW tensor from the slice (not a view)
+                x_partial = x[:, :i].clone().unsqueeze(-1)  # [batch_size, i, 1]
                 x_partial_embed = self.input_embedding(x_partial)
                 x_partial_embed = self.pos_encoding(x_partial_embed)
                 
@@ -299,14 +298,13 @@ class ScalableAutoregressiveFlowLayer(nn.Module):
                 
                 # Inverse transformation for dimension i
                 scale_i = torch.exp(log_scale_i)
-                x_i = (z[:, i:i+1] - shift_i) / scale_i
-                x_components.append(x_i)
+                # Compute to temporary variable first, then assign
+                x_i_new = (z[:, i] - shift_i.squeeze(-1)) / scale_i.squeeze(-1)
+                x[:, i] = x_i_new  # Assign to pre-allocated tensor (OK because x not in computation graph yet)
                 
-                # Accumulate log determinant (negative for inverse, non-in-place)
+                # Accumulate log determinant (non-in-place)
                 log_det_total = log_det_total - log_scale_i.squeeze(-1)
         
-        # Concatenate all components
-        x = torch.cat(x_components, dim=1)
         return x, log_det_total
 
 

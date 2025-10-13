@@ -136,7 +136,7 @@ molecular_pt:
     
     training:
       epochs: 3000
-      batch_size: 64  # Optimized for T4 GPU
+      batch_size: 32  # Reduced for memory safety on T4
       learning_rate: 5.0e-4
       eval_interval: 100
       weight_decay: 1.0e-5
@@ -157,6 +157,43 @@ molecular_pt:
       embed_dim: 128      # Increased from 96
       num_heads: 8        # Increased from 4 (matches standard)
       num_transformer_layers: 4  # Increased from 3
+      dropout: 0.1
+    
+    normalization:
+      mode: "per_atom"
+  
+  # Ultra-light GPU preset (for very limited VRAM)
+  aa_300_450_gpu_light:
+    data_path: "datasets/AA/pt_AA.pt"
+    source_temp_idx: 0  # 300K
+    target_temp_idx: 1  # 450K
+    pdb_path: "datasets/AA/ref.pdb"
+    
+    model: "scalable_transformer"
+    use_energy: true
+    use_energy_gating: true
+    E_cut: 500.0
+    E_max: 10000.0
+    
+    training:
+      epochs: 3000
+      batch_size: 16  # Very small for memory-constrained GPUs
+      learning_rate: 5.0e-4
+      eval_interval: 100
+      weight_decay: 1.0e-5
+      use_warmup: true
+      warmup_epochs: 50
+      use_scheduler: true
+      scheduler_patience: 50
+      scheduler_factor: 0.5
+      save_best_model: true
+      gradient_clip_norm: 1.0
+    
+    model_params:
+      num_flow_layers: 4  # Smaller model
+      embed_dim: 96       # Smaller embeddings
+      num_heads: 4        # Fewer heads
+      num_transformer_layers: 3  # Fewer layers
       dropout: 0.1
     
     normalization:
@@ -239,7 +276,7 @@ ablation_studies:
     E_max: 10000.0
     training:
       epochs: 1500
-      batch_size: 64
+      batch_size: 32  # Reduced for GPU memory safety
       learning_rate: 5.0e-4
       eval_interval: 100
       weight_decay: 1.0e-5
@@ -270,7 +307,7 @@ ablation_studies:
     use_energy_gating: false  # ABLATED
     training:
       epochs: 1500
-      batch_size: 64
+      batch_size: 32  # Reduced for GPU memory safety
       learning_rate: 5.0e-4
       eval_interval: 100
       weight_decay: 1.0e-5
@@ -303,7 +340,7 @@ ablation_studies:
     E_max: 10000.0
     training:
       epochs: 1500
-      batch_size: 64
+      batch_size: 32  # Reduced for GPU memory safety
       learning_rate: 5.0e-4
       eval_interval: 100
       weight_decay: 1.0e-5
@@ -335,7 +372,7 @@ ablation_studies:
     E_max: 10000.0
     training:
       epochs: 1500
-      batch_size: 64
+      batch_size: 32  # Reduced for GPU memory safety
       learning_rate: 5.0e-4
       eval_interval: 100
       weight_decay: 1.0e-5
@@ -366,7 +403,7 @@ ablation_studies:
     E_max: 10000.0
     training:
       epochs: 1500
-      batch_size: 64
+      batch_size: 32  # Reduced for GPU memory safety
       learning_rate: 5.0e-4
       eval_interval: 100
       weight_decay: 1.0e-5
@@ -397,7 +434,7 @@ ablation_studies:
     use_energy_gating: false  # ABLATED
     training:
       epochs: 1500
-      batch_size: 64
+      batch_size: 32  # Reduced for GPU memory safety
       learning_rate: 5.0e-4
       eval_interval: 100
       weight_decay: 1.0e-5

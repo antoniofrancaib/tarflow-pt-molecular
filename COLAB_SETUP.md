@@ -84,7 +84,7 @@ import os
 torch.cuda.empty_cache()
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 
-# Use GPU-optimized preset (6.5M params, balanced for T4)
+# Use GPU-optimized preset (6.5M params, batch_size=32 for T4)
 !$HOME/miniforge3/bin/python main.py train-molecular \
     --preset aa_300_450_gpu \
     --epochs 100 \
@@ -101,7 +101,7 @@ import os
 torch.cuda.empty_cache()
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 
-# GPU-optimized preset: 6.5M params, batch_size=64
+# GPU-optimized preset: 6.5M params, batch_size=32
 !$HOME/miniforge3/bin/python main.py train-molecular \
     --preset aa_300_450_gpu \
     --epochs 3000 \
@@ -172,13 +172,17 @@ print("   - Energy validation plots")
 - Solution: Use `$HOME/miniforge3/bin/python` not just `python`
 
 **Issue: CUDA out of memory**
-- Solution: The setup now uses `aa_300_450_gpu` preset (smaller model, batch_size=32)
-- If still OOM, reduce batch further: `--batch-size 16` or `--batch-size 8`
-- Or restart runtime: Runtime → Restart runtime and try again
-- For larger model (aa_300_450): Use A100 GPU or CPU
+- **Quick fix**: Use ultra-light preset `aa_300_450_gpu_light` (4M params, batch_size=16)
+- Solution 1: Restart runtime (Runtime → Restart runtime) then run Cell 5 again
+- Solution 2: Reduce batch size: `--batch-size 16` or `--batch-size 8`
+- Solution 3: Pull latest code with memory-efficient inverse operation
+- For full model (17.8M params): Use A100 GPU
 
 **Issue: Training too slow**
-- Solution: Use T4 GPU or higher (Runtime → Change runtime type)
+- Solution: Use better GPU (Runtime → Change runtime type → GPU type)
+  * T4 (15GB): ~4-5 hours for 3000 epochs
+  * V100 (16GB): ~3-4 hours
+  * A100 (40GB): ~2 hours (can use full model)
 - T4 (15GB): Use aa_300_450_gpu preset (recommended)
 - V100/A100 (16GB+): Can use aa_300_450 with `--batch-size 64`
 
