@@ -13,6 +13,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 from .openmm_energy import compute_reduced_energy
+from .energy_gating import EnergyGating
 
 
 class MolecularPTTrainer:
@@ -29,6 +30,9 @@ class MolecularPTTrainer:
         dataset,
         device: str = 'cpu',
         use_energy: bool = True,
+        use_energy_gating: bool = True,
+        E_cut: float = 500.0,
+        E_max: float = 10000.0,
     ):
         """Initialize molecular PT trainer.
         
@@ -37,11 +41,26 @@ class MolecularPTTrainer:
             dataset: MolecularPTDataset instance
             device: Device for training
             use_energy: If True, use OpenMM energy; else use density matching
+            use_energy_gating: If True, apply energy regularization for stability
+            E_cut: Soft energy regularization threshold (kJ/mol)
+            E_max: Hard energy clamp threshold (kJ/mol)
         """
         self.model = model.to(device)
         self.dataset = dataset
         self.device = device
         self.use_energy = use_energy
+        self.use_energy_gating = use_energy_gating
+        
+        # Initialize energy gating
+        if use_energy_gating:
+            self.energy_gating = EnergyGating(
+                E_cut=E_cut,
+                E_max=E_max,
+                skip_threshold=0.9,
+                log_warnings=True,
+            )
+        else:
+            self.energy_gating = None
         
         # Get inverse temperatures
         self.beta_source, self.beta_target = dataset.get_betas()
@@ -51,6 +70,8 @@ class MolecularPTTrainer:
         print(f"  β_source = {self.beta_source:.4f} mol/kJ")
         print(f"  β_target = {self.beta_target:.4f} mol/kJ")
         print(f"  Energy evaluation: {'OpenMM' if use_energy else 'density matching'}")
+        if use_energy_gating:
+            print(f"  Energy gating: ON (E_cut={E_cut:.0f}, E_max={E_max:.0f} kJ/mol)")
     
     def compute_forward_loss(
         self,
@@ -74,8 +95,20 @@ class MolecularPTTrainer:
             # Denormalize for OpenMM energy evaluation
             x_target_denorm = self.dataset.denormalize(x_target_pred)
             
-            # Compute reduced energy β·U(T(x_source))
-            reduced_energy = compute_reduced_energy(x_target_denorm, self.beta_target)
+            # Compute potential energy U(T(x_source))
+            U = compute_reduced_energy(x_target_denorm, self.beta_target) / self.beta_target
+            
+            # Apply energy gating if enabled
+            if self.use_energy_gating:
+                U_gated, gating_info = self.energy_gating.apply_gating(U)
+                if U_gated is None:
+                    # Batch skipped due to extreme energies
+                    return None, {'skipped': True, 'gating_info': gating_info}
+                # Compute reduced energy from gated values
+                reduced_energy = self.beta_target * U_gated
+            else:
+                reduced_energy = self.beta_target * U
+            
             energy_term = reduced_energy.mean()
         else:
             # Density matching: minimize KL divergence (no explicit energy)
@@ -117,8 +150,20 @@ class MolecularPTTrainer:
             # Denormalize for OpenMM energy evaluation
             x_source_denorm = self.dataset.denormalize(x_source_pred)
             
-            # Compute reduced energy β·U(T^{-1}(x_target))
-            reduced_energy = compute_reduced_energy(x_source_denorm, self.beta_source)
+            # Compute potential energy U(T^{-1}(x_target))
+            U = compute_reduced_energy(x_source_denorm, self.beta_source) / self.beta_source
+            
+            # Apply energy gating if enabled
+            if self.use_energy_gating:
+                U_gated, gating_info = self.energy_gating.apply_gating(U)
+                if U_gated is None:
+                    # Batch skipped due to extreme energies
+                    return None, {'skipped': True, 'gating_info': gating_info}
+                # Compute reduced energy from gated values
+                reduced_energy = self.beta_source * U_gated
+            else:
+                reduced_energy = self.beta_source * U
+            
             energy_term = reduced_energy.mean()
         else:
             # Density matching: minimize KL divergence
@@ -164,6 +209,20 @@ class MolecularPTTrainer:
         loss_fwd, metrics_fwd = self.compute_forward_loss(x_source)
         loss_inv, metrics_inv = self.compute_inverse_loss(x_target)
         
+        # Check if either direction was skipped due to extreme energies
+        if metrics_fwd.get('skipped', False) or metrics_inv.get('skipped', False):
+            # Skip this batch - return dummy metrics without gradient update
+            return {
+                'total_loss': 0.0,
+                'fwd_loss': 0.0,
+                'inv_loss': 0.0,
+                'fwd_energy': 0.0,
+                'inv_energy': 0.0,
+                'fwd_log_det': 0.0,
+                'inv_log_det': 0.0,
+                'batch_skipped': True,
+            }
+        
         # Total loss (sum of forward and inverse)
         total_loss = loss_fwd + loss_inv
         
@@ -177,6 +236,7 @@ class MolecularPTTrainer:
             **metrics_fwd,
             **metrics_inv,
             'total_loss': total_loss.item(),
+            'batch_skipped': False,
         }
         
         return metrics
@@ -226,6 +286,7 @@ class MolecularPTTrainer:
         best_loss = float('inf')
         best_epoch = 0
         patience_counter = 0
+        skipped_batches_count = 0
         
         print(f"\n{'='*70}")
         print(f"🧬 Molecular Cross-Temperature Transport Training")
@@ -233,6 +294,8 @@ class MolecularPTTrainer:
         print(f"Model: {config.get('model_type', 'ScalableTransformerFlow')}")
         print(f"Transport: {self.dataset.source_temp}K → {self.dataset.target_temp}K")
         print(f"Epochs: {num_epochs}, Batch size: {batch_size}, LR: {learning_rate}")
+        if self.use_energy_gating:
+            print(f"Energy gating: ENABLED")
         print(f"{'='*70}\n")
         
         # Training loop with live metrics
@@ -247,8 +310,12 @@ class MolecularPTTrainer:
             metrics = self.train_step(optimizer, batch_size)
             history.append(metrics)
             
-            # Save best model checkpoint
-            if metrics['total_loss'] < best_loss:
+            # Track skipped batches
+            if metrics.get('batch_skipped', False):
+                skipped_batches_count += 1
+            
+            # Save best model checkpoint (only if batch not skipped)
+            if not metrics.get('batch_skipped', False) and metrics['total_loss'] < best_loss:
                 best_loss = metrics['total_loss']
                 best_epoch = epoch + 1
                 patience_counter = 0
@@ -301,6 +368,13 @@ class MolecularPTTrainer:
         print(f"\n✅ Final model saved: {model_path}")
         print(f"✅ Best model saved: best_model_{int(self.dataset.source_temp)}_{int(self.dataset.target_temp)}.pt")
         print(f"   Best loss: {best_loss:.4e} at epoch {best_epoch}")
+        
+        # Report energy gating statistics
+        if self.use_energy_gating:
+            gating_stats = self.energy_gating.get_statistics()
+            print(f"\n📊 Energy Gating Statistics:")
+            print(f"   Skipped batches: {skipped_batches_count}/{num_epochs} ({skipped_batches_count/num_epochs*100:.1f}%)")
+            print(f"   Regularized samples: {gating_stats['regularized_samples']}/{gating_stats['total_samples']} ({gating_stats['regularization_rate']*100:.1f}%)")
         
         # Plot loss curves
         print(f"\n📊 Generating loss curve plots...")

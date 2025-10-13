@@ -529,6 +529,9 @@ def train_molecular_pt(args):
         dataset=dataset,
         device=device,
         use_energy=config.get('use_energy', True),
+        use_energy_gating=config.get('use_energy_gating', True),
+        E_cut=config.get('E_cut', 500.0),
+        E_max=config.get('E_max', 10000.0),
     )
     
     # Train

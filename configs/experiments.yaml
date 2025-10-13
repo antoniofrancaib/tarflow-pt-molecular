@@ -97,6 +97,9 @@ molecular_pt:
     
     model: "scalable_transformer"
     use_energy: true  # Use OpenMM energy evaluation
+    use_energy_gating: true  # Prevents gradient instability
+    E_cut: 500.0  # Soft regularization threshold (kJ/mol)
+    E_max: 10000.0  # Hard clamp threshold (kJ/mol)
     
     training:
       epochs: 3000
@@ -125,6 +128,9 @@ molecular_pt:
     
     model: "scalable_transformer"
     use_energy: true
+    use_energy_gating: true  # Prevents gradient instability
+    E_cut: 500.0  # Soft regularization threshold (kJ/mol)
+    E_max: 10000.0  # Hard clamp threshold (kJ/mol)
     
     training:
       epochs: 3000
