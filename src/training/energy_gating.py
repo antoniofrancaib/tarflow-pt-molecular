@@ -34,6 +34,7 @@ class EnergyGating:
         E_max: float = 10000.0,
         skip_threshold: float = 0.9,
         log_warnings: bool = True,
+        warmup_epochs: int = 100,
     ):
         """Initialize energy gating.
         
@@ -45,17 +46,40 @@ class EnergyGating:
             skip_threshold: If this fraction of batch exceeds E_max, skip batch
                             (0.9 = skip if >90% of samples are extreme)
             log_warnings: Whether to log when batches are skipped
+            warmup_epochs: Number of epochs to use very lenient thresholds
+                          (allows bad initialization to improve)
         """
         self.E_cut = E_cut
-        self.E_max = E_max
+        self.E_max_target = E_max  # Target E_max after warmup
+        self.E_max = E_max * 1000  # Start very lenient (10M kJ/mol)
         self.skip_threshold = skip_threshold
         self.log_warnings = log_warnings
+        self.warmup_epochs = warmup_epochs
+        self.current_epoch = 0
         
         # Statistics tracking
         self.total_batches = 0
         self.skipped_batches = 0
         self.regularized_samples = 0
         self.total_samples = 0
+    
+    def set_epoch(self, epoch: int):
+        """Update current epoch for progressive gating.
+        
+        Args:
+            epoch: Current training epoch
+        """
+        self.current_epoch = epoch
+        
+        # Progressive E_max: start very high, linearly decrease to target
+        if epoch < self.warmup_epochs:
+            progress = epoch / self.warmup_epochs
+            # E_max decreases from 10M to target (10k)
+            E_max_initial = self.E_max_target * 1000
+            self.E_max = E_max_initial * (1 - progress) + self.E_max_target * progress
+        else:
+            # After warmup, use configured target E_max
+            self.E_max = self.E_max_target
     
     def apply_gating(
         self,

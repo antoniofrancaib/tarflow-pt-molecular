@@ -58,6 +58,7 @@ class MolecularPTTrainer:
                 E_max=E_max,
                 skip_threshold=0.9,
                 log_warnings=True,
+                warmup_epochs=100,  # Progressive gating: lenient early, strict later
             )
         else:
             self.energy_gating = None
@@ -325,6 +326,10 @@ class MolecularPTTrainer:
         # Training loop with live metrics
         pbar = tqdm(range(num_epochs), desc="Training")
         for epoch in pbar:
+            # Update energy gating epoch (for progressive thresholds)
+            if self.use_energy_gating:
+                self.energy_gating.set_epoch(epoch)
+            
             # Learning rate warmup (if enabled)
             if use_warmup and epoch < warmup_epochs:
                 warmup_factor = (epoch + 1) / warmup_epochs
@@ -376,7 +381,7 @@ class MolecularPTTrainer:
                 print(f"  LR: {optimizer.param_groups[0]['lr']:.2e}")
                 
                 # Show improvement from epoch 1
-                if epoch > 0 and 'initial_loss' in locals():
+                if epoch > 0 and 'initial_loss' in locals() and initial_loss > 0:
                     improvement = (initial_loss - metrics['total_loss']) / initial_loss * 100
                     print(f"  Improvement from start: {improvement:.1f}%")
                     if metrics['total_loss'] == best_loss:
@@ -385,6 +390,8 @@ class MolecularPTTrainer:
                         print(f"  ⚠️  No improvement for {patience_counter} epochs")
                 elif epoch == 0:
                     initial_loss = metrics['total_loss']
+                    if initial_loss == 0:
+                        print(f"  ⚠️  Batch skipped (extreme energies), waiting for valid batch...")
         
         # Save final model
         model_path = os.path.join(save_dir, f"molecular_pt_{int(self.dataset.source_temp)}_{int(self.dataset.target_temp)}.pt")
