@@ -14,6 +14,7 @@ import torch
 from torch import Tensor
 from typing import Tuple, Optional
 import warnings
+import numpy as np
 
 
 class EnergyGating:
@@ -31,30 +32,35 @@ class EnergyGating:
     def __init__(
         self,
         E_cut: float = 500.0,
-        E_max: float = 10000.0,
+        E_max: float = 100000.0,  # Increased from 10k to 100k kJ/mol
         skip_threshold: float = 0.9,
         log_warnings: bool = True,
-        warmup_epochs: int = 100,
+        warmup_epochs: int = 300,  # Increased from 100 to 300 epochs
+        min_learning_epochs: int = 50,  # Keep very lenient for first 50 epochs
     ):
-        """Initialize energy gating.
+        """Initialize energy gating with progressive thresholds.
         
         Args:
             E_cut: Soft regularization threshold in kJ/mol
                    (typical peptide energies: -600 to +200)
-            E_max: Hard clamp threshold in kJ/mol
-                   (prevents numerical overflow)
+            E_max: Hard clamp threshold in kJ/mol after warmup
+                   (prevents numerical overflow, default 100k)
             skip_threshold: If this fraction of batch exceeds E_max, skip batch
                             (0.9 = skip if >90% of samples are extreme)
             log_warnings: Whether to log when batches are skipped
-            warmup_epochs: Number of epochs to use very lenient thresholds
-                          (allows bad initialization to improve)
+            warmup_epochs: Number of epochs for progressive E_max decay
+                           (uses exponential schedule to stay lenient longer)
+            min_learning_epochs: Epochs to keep E_max extremely high
+                                 (allows model to learn basics first)
         """
         self.E_cut = E_cut
-        self.E_max_target = E_max  # Target E_max after warmup
-        self.E_max = E_max * 1000  # Start very lenient (10M kJ/mol)
+        self.E_max_target = E_max  # Target E_max after warmup (100k)
+        self.E_max_initial = 1e10  # Start EXTREMELY lenient (10 billion kJ/mol)
+        self.E_max = self.E_max_initial
         self.skip_threshold = skip_threshold
         self.log_warnings = log_warnings
         self.warmup_epochs = warmup_epochs
+        self.min_learning_epochs = min_learning_epochs
         self.current_epoch = 0
         
         # Statistics tracking
@@ -66,19 +72,32 @@ class EnergyGating:
     def set_epoch(self, epoch: int):
         """Update current epoch for progressive gating.
         
+        Uses a 3-stage schedule:
+        1. Epochs 0-min_learning: E_max = initial (extremely lenient)
+        2. Epochs min_learning-warmup: Exponential decay to target
+        3. Epochs warmup+: E_max = target (strict)
+        
         Args:
             epoch: Current training epoch
         """
         self.current_epoch = epoch
         
-        # Progressive E_max: start very high, linearly decrease to target
-        if epoch < self.warmup_epochs:
-            progress = epoch / self.warmup_epochs
-            # E_max decreases from 10M to target (10k)
-            E_max_initial = self.E_max_target * 1000
-            self.E_max = E_max_initial * (1 - progress) + self.E_max_target * progress
+        if epoch < self.min_learning_epochs:
+            # Stage 1: Keep E_max extremely high to allow initial learning
+            self.E_max = self.E_max_initial
+        elif epoch < self.warmup_epochs:
+            # Stage 2: Exponential decay from initial to target
+            # Exponential decay stays lenient longer than linear
+            warmup_progress = (epoch - self.min_learning_epochs) / (self.warmup_epochs - self.min_learning_epochs)
+            
+            # Use exponential interpolation in log space
+            # E_max = initial * (target/initial)^progress
+            log_initial = np.log(self.E_max_initial)
+            log_target = np.log(self.E_max_target)
+            log_E_max = log_initial + warmup_progress * (log_target - log_initial)
+            self.E_max = np.exp(log_E_max)
         else:
-            # After warmup, use configured target E_max
+            # Stage 3: Use final target threshold
             self.E_max = self.E_max_target
     
     def apply_gating(
