@@ -267,18 +267,22 @@ class ScalableAutoregressiveFlowLayer(nn.Module):
             log_det: log determinant of Jacobian
         """
         batch_size = z.shape[0]
-        x = torch.zeros_like(z)
+        x_components = []  # Collect components to avoid in-place operations
         log_det_total = torch.zeros(batch_size, device=z.device)
         
         # Sequentially reconstruct each dimension
         for i in range(self.input_dim):
             if i == 0:
                 # First dimension: no transformation
-                x[:, i] = z[:, i]
+                x_i = z[:, i:i+1]
+                x_components.append(x_i)
             else:
+                # Build x from components collected so far
+                x_so_far = torch.cat(x_components, dim=1)
+                
                 # For dimension i, use previous dimensions x[:, :i]
                 # Embed previous dimensions
-                x_partial = x[:, :i].unsqueeze(-1)  # [batch_size, i, 1]
+                x_partial = x_so_far.unsqueeze(-1)  # [batch_size, i, 1]
                 x_partial_embed = self.input_embedding(x_partial)
                 x_partial_embed = self.pos_encoding(x_partial_embed)
                 
@@ -295,11 +299,14 @@ class ScalableAutoregressiveFlowLayer(nn.Module):
                 
                 # Inverse transformation for dimension i
                 scale_i = torch.exp(log_scale_i)
-                x[:, i:i+1] = (z[:, i:i+1] - shift_i) / scale_i
+                x_i = (z[:, i:i+1] - shift_i) / scale_i
+                x_components.append(x_i)
                 
-                # Accumulate log determinant (negative for inverse)
-                log_det_total -= log_scale_i.squeeze(-1)
+                # Accumulate log determinant (negative for inverse, non-in-place)
+                log_det_total = log_det_total - log_scale_i.squeeze(-1)
         
+        # Concatenate all components
+        x = torch.cat(x_components, dim=1)
         return x, log_det_total
 
 
@@ -359,7 +366,7 @@ class ScalableTransformerFlow(nn.Module):
         for i, flow_layer in enumerate(self.flow_layers):
             # Apply autoregressive transformation
             z, log_det = flow_layer(z)
-            log_det_total += log_det
+            log_det_total = log_det_total + log_det  # Non-in-place addition
             
             # Apply permutation (except for last layer)
             if i < len(self.permutations):
@@ -394,7 +401,7 @@ class ScalableTransformerFlow(nn.Module):
             
             # Apply inverse autoregressive transformation
             x, log_det = self.flow_layers[i].inverse(x)
-            log_det_total += log_det
+            log_det_total = log_det_total + log_det  # Non-in-place addition
         
         return x, log_det_total
     

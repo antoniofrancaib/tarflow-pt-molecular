@@ -160,16 +160,20 @@ class AutoregressiveFlowLayer(nn.Module):
             log_det: log determinant of Jacobian
         """
         batch_size = z.shape[0]
-        x = torch.zeros_like(z)
+        x_components = []  # Collect components to avoid in-place operations
         log_det_total = torch.zeros(batch_size, device=z.device)
         
         # Sequentially compute each dimension
         for i in range(self.input_dim):
             if i == 0:
-                x[:, i] = z[:, i]
+                x_i = z[:, i:i+1]
+                x_components.append(x_i)
             else:
+                # Build x from components collected so far
+                x_so_far = torch.cat(x_components, dim=1)
+                
                 # Use previous dimensions to compute transformation parameters
-                x_partial = x[:, :i].unsqueeze(-1)  # (B, i, 1)
+                x_partial = x_so_far.unsqueeze(-1)  # (B, i, 1)
                 pos_embed_partial = self.pos_embed[:, :i, :]  # (1, i, hidden_dim)
                 
                 h = self.proj_in(x_partial) + pos_embed_partial
@@ -184,9 +188,14 @@ class AutoregressiveFlowLayer(nn.Module):
                 shift_i = self.proj_shift(h[:, -1:]).squeeze(-1)      # (B, 1)
                 
                 scale_i = torch.exp(log_scale_i)
-                x[:, i:i+1] = (z[:, i:i+1] - shift_i) / scale_i
-                log_det_total -= log_scale_i.squeeze(-1)
+                x_i = (z[:, i:i+1] - shift_i) / scale_i
+                x_components.append(x_i)
+                
+                # Accumulate log determinant (negative for inverse, non-in-place)
+                log_det_total = log_det_total - log_scale_i.squeeze(-1)
         
+        # Concatenate all components
+        x = torch.cat(x_components, dim=1)
         return x, log_det_total
 
 
@@ -231,7 +240,7 @@ class AutoregressiveNormalizingFlow(nn.Module):
         
         for i, flow_layer in enumerate(self.flow_layers):
             z, log_det = flow_layer(z)
-            log_det_total += log_det
+            log_det_total = log_det_total + log_det  # Non-in-place addition
             
             # Apply permutation (except for last layer)
             if i < len(self.permutations):
@@ -261,7 +270,7 @@ class AutoregressiveNormalizingFlow(nn.Module):
                 x = F.linear(x, perm_inv)
             
             x, log_det = self.flow_layers[i].inverse(x)
-            log_det_total += log_det
+            log_det_total = log_det_total + log_det  # Non-in-place addition
         
         return x, log_det_total
     
