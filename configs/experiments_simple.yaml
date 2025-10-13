@@ -1,0 +1,223 @@
+# =============================================================================
+# Molecular PT Training Configuration
+# =============================================================================
+
+molecular_pt:
+  # CPU/Local Training (larger model)
+  aa_300_450:
+    data_path: "datasets/AA/pt_AA.pt"
+    source_temp_idx: 0  # 300K
+    target_temp_idx: 1  # 450K
+    pdb_path: "datasets/AA/ref.pdb"
+    
+    model: "scalable_transformer"
+    use_energy: true
+    use_energy_gating: true
+    E_cut: 500.0
+    E_max: 100000000.0
+    logdet_clip: 100.0
+    
+    training:
+      epochs: 3000
+      batch_size: 256
+      learning_rate: 1.0e-4
+      eval_interval: 100
+      weight_decay: 1.0e-5
+      use_warmup: true
+      warmup_epochs: 50
+      use_scheduler: true
+      scheduler_patience: 50
+      scheduler_factor: 0.5
+      save_best_model: true
+      gradient_clip_norm: 0.5
+    
+    model_params:
+      num_flow_layers: 8
+      embed_dim: 192
+      num_heads: 8
+      num_transformer_layers: 5
+      dropout: 0.1
+    
+    normalization:
+      mode: "per_atom"
+  
+  # GPU Training (Colab T4, smaller model for memory)
+  aa_300_450_gpu:
+    data_path: "datasets/AA/pt_AA.pt"
+    source_temp_idx: 0
+    target_temp_idx: 1
+    pdb_path: "datasets/AA/ref.pdb"
+    
+    model: "scalable_transformer"
+    use_energy: true
+    use_energy_gating: true
+    E_cut: 500.0
+    E_max: 100000000.0
+    logdet_clip: 100.0
+    
+    training:
+      epochs: 3000
+      batch_size: 32
+      learning_rate: 1.0e-4
+      eval_interval: 100
+      weight_decay: 1.0e-5
+      use_warmup: true
+      warmup_epochs: 50
+      use_scheduler: true
+      scheduler_patience: 50
+      scheduler_factor: 0.5
+      save_best_model: true
+      gradient_clip_norm: 0.5
+    
+    model_params:
+      num_flow_layers: 6
+      embed_dim: 128
+      num_heads: 8
+      num_transformer_layers: 4
+      dropout: 0.1
+    
+    normalization:
+      mode: "per_atom"
+  
+  # Ultra-light for very limited VRAM
+  aa_300_450_gpu_light:
+    data_path: "datasets/AA/pt_AA.pt"
+    source_temp_idx: 0
+    target_temp_idx: 1
+    pdb_path: "datasets/AA/ref.pdb"
+    
+    model: "scalable_transformer"
+    use_energy: true
+    use_energy_gating: true
+    E_cut: 500.0
+    E_max: 100000000.0
+    logdet_clip: 100.0
+    
+    training:
+      epochs: 3000
+      batch_size: 16
+      learning_rate: 1.0e-4
+      eval_interval: 100
+      weight_decay: 1.0e-5
+      use_warmup: true
+      warmup_epochs: 50
+      use_scheduler: true
+      scheduler_patience: 50
+      scheduler_factor: 0.5
+      save_best_model: true
+      gradient_clip_norm: 0.5
+    
+    model_params:
+      num_flow_layers: 4
+      embed_dim: 96
+      num_heads: 4
+      num_transformer_layers: 3
+      dropout: 0.1
+    
+    normalization:
+      mode: "per_atom"
+
+# =============================================================================
+# Ablation Studies
+# =============================================================================
+
+ablation_studies:
+  # Baseline (all features)
+  baseline_gpu:
+    data_path: "datasets/AA/pt_AA.pt"
+    source_temp_idx: 0
+    target_temp_idx: 1
+    pdb_path: "datasets/AA/ref.pdb"
+    model: "scalable_transformer"
+    use_energy: true
+    use_energy_gating: true
+    E_cut: 500.0
+    E_max: 100000000.0
+    logdet_clip: 100.0
+    training:
+      epochs: 1500
+      batch_size: 32
+      learning_rate: 1.0e-4
+      eval_interval: 100
+      weight_decay: 1.0e-5
+      use_warmup: true
+      warmup_epochs: 50
+      use_scheduler: true
+      scheduler_patience: 50
+      scheduler_factor: 0.5
+      save_best_model: true
+      gradient_clip_norm: 0.5
+    model_params:
+      num_flow_layers: 6
+      embed_dim: 128
+      num_heads: 8
+      num_transformer_layers: 4
+      dropout: 0.1
+    normalization:
+      mode: "per_atom"
+  
+  # No energy gating
+  no_energy_gating_gpu:
+    data_path: "datasets/AA/pt_AA.pt"
+    source_temp_idx: 0
+    target_temp_idx: 1
+    pdb_path: "datasets/AA/ref.pdb"
+    model: "scalable_transformer"
+    use_energy: true
+    use_energy_gating: false
+    logdet_clip: 100.0
+    training:
+      epochs: 1500
+      batch_size: 32
+      learning_rate: 1.0e-4
+      eval_interval: 100
+      weight_decay: 1.0e-5
+      use_warmup: true
+      warmup_epochs: 50
+      use_scheduler: true
+      scheduler_patience: 50
+      scheduler_factor: 0.5
+      save_best_model: true
+      gradient_clip_norm: 0.5
+    model_params:
+      num_flow_layers: 6
+      embed_dim: 128
+      num_heads: 8
+      num_transformer_layers: 4
+      dropout: 0.1
+    normalization:
+      mode: "per_atom"
+  
+  # No warmup
+  no_warmup_gpu:
+    data_path: "datasets/AA/pt_AA.pt"
+    source_temp_idx: 0
+    target_temp_idx: 1
+    pdb_path: "datasets/AA/ref.pdb"
+    model: "scalable_transformer"
+    use_energy: true
+    use_energy_gating: true
+    E_cut: 500.0
+    E_max: 100000000.0
+    logdet_clip: 100.0
+    training:
+      epochs: 1500
+      batch_size: 32
+      learning_rate: 1.0e-4
+      eval_interval: 100
+      weight_decay: 1.0e-5
+      use_warmup: false
+      use_scheduler: true
+      scheduler_patience: 50
+      scheduler_factor: 0.5
+      save_best_model: true
+      gradient_clip_norm: 0.5
+    model_params:
+      num_flow_layers: 6
+      embed_dim: 128
+      num_heads: 8
+      num_transformer_layers: 4
+      dropout: 0.1
+    normalization:
+      mode: "per_atom"
+

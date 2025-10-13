@@ -88,7 +88,7 @@ distributions:
 # =============================================================================
 
 molecular_pt:
-  # Default 300K → 450K transport
+  # Default 300K → 450K transport (CPU/local with larger model)
   aa_300_450:
     data_path: "datasets/AA/pt_AA.pt"
     source_temp_idx: 0  # 300K
@@ -96,17 +96,25 @@ molecular_pt:
     pdb_path: "datasets/AA/ref.pdb"
     
     model: "scalable_transformer"
-    use_energy: true  # Use OpenMM energy evaluation
-    use_energy_gating: true  # Prevents gradient instability
-    E_cut: 500.0  # Soft regularization threshold (kJ/mol)
-    E_max: 100000000.0  # Hard clamp threshold after warmup (100M kJ/mol)
+    use_energy: true
+    use_energy_gating: true
+    E_cut: 500.0
+    E_max: 100000000.0
+    logdet_clip: 100.0
     
     training:
       epochs: 3000
       batch_size: 256
-      learning_rate: 5.0e-4
+      learning_rate: 1.0e-4
       eval_interval: 100
       weight_decay: 1.0e-5
+      use_warmup: true
+      warmup_epochs: 50
+      use_scheduler: true
+      scheduler_patience: 50
+      scheduler_factor: 0.5
+      save_best_model: true
+      gradient_clip_norm: 0.5
     
     model_params:
       num_flow_layers: 8

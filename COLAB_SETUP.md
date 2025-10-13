@@ -1,5 +1,9 @@
 # 🚀 Google Colab Setup - Molecular Cross-Temperature Transport
 
+## ⚠️ IMPORTANT: Always use `aa_300_450_gpu` preset!
+- ✅ **Use**: `--preset aa_300_450_gpu` (optimized for Colab T4)
+- ❌ **Don't use**: `--preset aa_300_450` (missing critical fixes, will diverge!)
+
 ## ✅ WORKING SETUP (Copy-Paste Ready)
 
 ### Cell 1: GPU Check
