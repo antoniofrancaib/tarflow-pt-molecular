@@ -113,19 +113,33 @@ os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 from IPython.display import Image, display
 
 print("📊 Training Results:")
-display(Image('checkpoints/molecular_pt_aa_300_450/loss_curves_300_450.png'))
-display(Image('plots/molecular_pt_aa_300_450/ramachandran_300_450.png'))
-display(Image('plots/molecular_pt_aa_300_450/energy_validation_300_450.png'))
+
+# Loss curves (shows training progress)
+print("\n1️⃣ Loss Curves - Training Progress:")
+display(Image('checkpoints/molecular_pt_aa_300_450_gpu/loss_curves_300_450.png'))
+
+# Ramachandran plot (shows conformational quality)
+print("\n2️⃣ Ramachandran Plot - Conformational Distributions:")
+display(Image('plots/molecular_pt_aa_300_450_gpu/ramachandran_300_450.png'))
+
+# Energy distributions (shows thermodynamic accuracy)
+print("\n3️⃣ Energy Distributions - Thermodynamic Validation:")
+display(Image('plots/molecular_pt_aa_300_450_gpu/energy_validation_300_450.png'))
 ```
 
 ### Cell 8: Download Results
 ```python
-!zip -r results.zip checkpoints/molecular_pt_aa_300_450 plots/molecular_pt_aa_300_450 -q
+!zip -r results.zip checkpoints/molecular_pt_aa_300_450_gpu plots/molecular_pt_aa_300_450_gpu -q
 
 from google.colab import files
 files.download('results.zip')
 
 print("✅ Download complete!")
+print("\n📦 Includes:")
+print("   - Trained model weights")
+print("   - Loss curve plots")
+print("   - Ramachandran plots")
+print("   - Energy validation plots")
 ```
 
 ---

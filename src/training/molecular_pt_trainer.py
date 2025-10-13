@@ -205,12 +205,17 @@ class MolecularPTTrainer:
         learning_rate = training_config.get('learning_rate', 5e-4)
         eval_interval = training_config.get('eval_interval', 100)
         
-        # Setup optimizer
+        # Setup optimizer with warmup-friendly learning rate
         optimizer = optim.Adam(
             self.model.parameters(),
             lr=learning_rate,
             weight_decay=1e-5,
         )
+        
+        # Warmup scheduler: gradually increase LR for first 50 epochs
+        warmup_epochs = min(50, num_epochs // 20)
+        
+        # Main scheduler: reduce on plateau after warmup
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, mode='min', patience=200, factor=0.7, verbose=True
         )
@@ -226,21 +231,50 @@ class MolecularPTTrainer:
         print(f"Epochs: {num_epochs}, Batch size: {batch_size}, LR: {learning_rate}")
         print(f"{'='*70}\n")
         
-        # Training loop
-        for epoch in tqdm(range(num_epochs), desc="Training"):
+        # Training loop with live metrics
+        pbar = tqdm(range(num_epochs), desc="Training")
+        for epoch in pbar:
+            # Learning rate warmup
+            if epoch < warmup_epochs:
+                warmup_factor = (epoch + 1) / warmup_epochs
+                for param_group in optimizer.param_groups:
+                    param_group['lr'] = learning_rate * warmup_factor
+            
             metrics = self.train_step(optimizer, batch_size)
             history.append(metrics)
             
-            # Learning rate scheduling
-            scheduler.step(metrics['total_loss'])
+            # Learning rate scheduling (after warmup)
+            if epoch >= warmup_epochs:
+                scheduler.step(metrics['total_loss'])
             
-            # Periodic logging
-            if (epoch + 1) % eval_interval == 0 or epoch == 0:
+            # Update progress bar with live metrics
+            pbar.set_postfix({
+                'Loss': f"{metrics['total_loss']:.2e}",
+                'Fwd_E': f"{metrics['fwd_energy']:.2e}",
+                'Inv_E': f"{metrics['inv_energy']:.2e}",
+                'LR': f"{optimizer.param_groups[0]['lr']:.1e}"
+            })
+            
+            # Detailed logging: frequent early, then every eval_interval
+            log_this_epoch = (
+                epoch < 10 or  # First 10 epochs
+                (epoch < 100 and (epoch + 1) % 10 == 0) or  # Every 10 for first 100
+                (epoch + 1) % eval_interval == 0  # Standard interval after
+            )
+            
+            if log_this_epoch:
                 print(f"\nEpoch {epoch + 1}/{num_epochs}")
-                print(f"  Total Loss: {metrics['total_loss']:.4f}")
-                print(f"  Forward  - Energy: {metrics['fwd_energy']:.4f}, LogDet: {metrics['fwd_log_det']:.4f}")
-                print(f"  Inverse  - Energy: {metrics['inv_energy']:.4f}, LogDet: {metrics['inv_log_det']:.4f}")
+                print(f"  Total Loss: {metrics['total_loss']:.4e}")
+                print(f"  Forward  - Energy: {metrics['fwd_energy']:.4e}, LogDet: {metrics['fwd_log_det']:.4f}")
+                print(f"  Inverse  - Energy: {metrics['inv_energy']:.4e}, LogDet: {metrics['inv_log_det']:.4f}")
                 print(f"  LR: {optimizer.param_groups[0]['lr']:.2e}")
+                
+                # Show improvement from epoch 1
+                if epoch > 0 and 'initial_loss' in locals():
+                    improvement = (initial_loss - metrics['total_loss']) / initial_loss * 100
+                    print(f"  Improvement from start: {improvement:.1f}%")
+                elif epoch == 0:
+                    initial_loss = metrics['total_loss']
         
         # Save final model
         model_path = os.path.join(save_dir, f"molecular_pt_{int(self.dataset.source_temp)}_{int(self.dataset.target_temp)}.pt")
@@ -248,11 +282,17 @@ class MolecularPTTrainer:
         print(f"\n✅ Model saved: {model_path}")
         
         # Plot loss curves
-        self.plot_loss_curves(history, save_dir)
+        print(f"\n📊 Generating loss curve plots...")
+        loss_plot_path = self.plot_loss_curves(history, save_dir)
+        print(f"✅ Loss curves saved: {loss_plot_path}")
         
         print(f"\n{'='*70}")
         print(f"🎉 Training completed!")
-        print(f"{'='*70}\n")
+        print(f"{'='*70}")
+        print(f"\n📁 Results saved to: {save_dir}/")
+        print(f"   - Model: molecular_pt_{int(self.dataset.source_temp)}_{int(self.dataset.target_temp)}.pt")
+        print(f"   - Loss curves: loss_curves_{int(self.dataset.source_temp)}_{int(self.dataset.target_temp)}.png")
+        print(f"\n")
         
         return self.model, history
     
@@ -324,5 +364,5 @@ class MolecularPTTrainer:
         plt.savefig(plot_path, dpi=200, bbox_inches='tight')
         plt.close()
         
-        print(f"📊 Loss curves saved: {plot_path}")
+        return plot_path
 
