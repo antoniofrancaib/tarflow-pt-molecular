@@ -762,7 +762,7 @@ def main():
     # Molecular PT training command
     molecular_parser = subparsers.add_parser('train-molecular', help='Train molecular cross-temperature transport')
     molecular_parser.add_argument('--preset', type=str, required=True,
-                                 choices=['aa_300_450', 'aa_300_670', 'aa_300_1000'],
+                                 choices=['aa_300_450', 'aa_300_450_gpu', 'aa_300_670', 'aa_300_1000'],
                                  help='Molecular PT preset configuration')
     molecular_parser.add_argument('--epochs', type=int, help='Number of training epochs')
     molecular_parser.add_argument('--lr', type=float, help='Learning rate')
