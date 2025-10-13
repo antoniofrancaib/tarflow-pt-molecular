@@ -79,10 +79,10 @@ print("🚀 Quick training test (100 epochs, ~15 min)...")
 import torch
 torch.cuda.empty_cache()
 
+# Use GPU-optimized preset with smaller model
 !$HOME/miniforge3/bin/python main.py train-molecular \
-    --preset aa_300_450 \
+    --preset aa_300_450_gpu \
     --epochs 100 \
-    --batch-size 64 \
     --validate
 ```
 
@@ -94,11 +94,10 @@ print("🚀 Full training (3000 epochs, ~3-4 hours)...")
 import torch
 torch.cuda.empty_cache()
 
+# Use GPU-optimized preset
 !$HOME/miniforge3/bin/python main.py train-molecular \
-    --preset aa_300_450 \
+    --preset aa_300_450_gpu \
     --epochs 3000 \
-    --lr 5e-4 \
-    --batch-size 128 \
     --validate
 ```
 
@@ -130,7 +129,8 @@ print("✅ Download complete!")
 2. **All commands use** `$HOME/miniforge3/bin/python` 
 3. **Fixes imports** automatically (simtk → openmm)
 4. **GPU accelerated** PyTorch (from Colab)
-5. **Self-contained** - no external dependencies
+5. **GPU-optimized model** (aa_300_450_gpu preset: ~4M params vs ~18M for CPU version)
+6. **Self-contained** - no external dependencies
 
 ---
 
@@ -151,17 +151,20 @@ print("✅ Download complete!")
 - Solution: Use `$HOME/miniforge3/bin/python` not just `python`
 
 **Issue: CUDA out of memory**
-- Solution: The autoregressive inverse operation is memory-intensive. Try these in order:
-  1. Clear GPU cache: `torch.cuda.empty_cache()` before training
-  2. Reduce batch size: `--batch-size 32` or `--batch-size 16`
-  3. Restart runtime and run again (Runtime → Restart runtime)
-  4. Use gradient checkpointing (advanced, see code)
+- Solution: The setup now uses `aa_300_450_gpu` preset (smaller model, batch_size=32)
+- If still OOM, reduce batch further: `--batch-size 16` or `--batch-size 8`
+- Or restart runtime: Runtime → Restart runtime and try again
+- For larger model (aa_300_450): Use A100 GPU or CPU
 
 **Issue: Training too slow**
 - Solution: Use T4 GPU or higher (Runtime → Change runtime type)
-- T4 (15GB): batch_size=64
-- V100 (16GB): batch_size=96
-- A100 (40GB): batch_size=256
+- T4 (15GB): Use aa_300_450_gpu preset (recommended)
+- V100/A100 (16GB+): Can use aa_300_450 with `--batch-size 64`
+
+**Issue: Want better model quality**
+- The aa_300_450_gpu model is smaller but faster
+- For best quality, use aa_300_450 preset on local machine (CPU with large RAM)
+- Or use A100 GPU: `--preset aa_300_450 --batch-size 64`
 
 ---
 
