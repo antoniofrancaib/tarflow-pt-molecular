@@ -78,11 +78,13 @@ EOF
 ```python
 print("🚀 Quick training test (100 epochs, ~15 min)...")
 
-# Clear GPU cache first
+# Clear GPU cache and optimize memory allocation
 import torch
+import os
 torch.cuda.empty_cache()
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 
-# Use GPU-optimized preset with smaller model
+# Use GPU-optimized preset (6.5M params, balanced for T4)
 !$HOME/miniforge3/bin/python main.py train-molecular \
     --preset aa_300_450_gpu \
     --epochs 100 \
@@ -91,13 +93,15 @@ torch.cuda.empty_cache()
 
 ### Cell 6: Full Training (3000 epochs)
 ```python
-print("🚀 Full training (3000 epochs, ~3-4 hours)...")
+print("🚀 Full training (3000 epochs, ~4-5 hours)...")
 
-# Clear GPU cache first
+# Clear GPU cache and optimize memory allocation
 import torch
+import os
 torch.cuda.empty_cache()
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 
-# Use GPU-optimized preset
+# GPU-optimized preset: 6.5M params, batch_size=64
 !$HOME/miniforge3/bin/python main.py train-molecular \
     --preset aa_300_450_gpu \
     --epochs 3000 \
