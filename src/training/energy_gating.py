@@ -32,10 +32,10 @@ class EnergyGating:
     def __init__(
         self,
         E_cut: float = 500.0,
-        E_max: float = 100000.0,  # Increased from 10k to 100k kJ/mol
+        E_max: float = 1e8,  # 100 million kJ/mol (was 100k)
         skip_threshold: float = 0.9,
         log_warnings: bool = True,
-        warmup_epochs: int = 300,  # Increased from 100 to 300 epochs
+        warmup_epochs: int = 100,  # Progressive decay over 100 epochs
         min_learning_epochs: int = 50,  # Keep very lenient for first 50 epochs
     ):
         """Initialize energy gating with progressive thresholds.
@@ -44,7 +44,7 @@ class EnergyGating:
             E_cut: Soft regularization threshold in kJ/mol
                    (typical peptide energies: -600 to +200)
             E_max: Hard clamp threshold in kJ/mol after warmup
-                   (prevents numerical overflow, default 100k)
+                   (prevents numerical overflow, default 100M)
             skip_threshold: If this fraction of batch exceeds E_max, skip batch
                             (0.9 = skip if >90% of samples are extreme)
             log_warnings: Whether to log when batches are skipped
@@ -54,8 +54,8 @@ class EnergyGating:
                                  (allows model to learn basics first)
         """
         self.E_cut = E_cut
-        self.E_max_target = E_max  # Target E_max after warmup (100k)
-        self.E_max_initial = 1e10  # Start EXTREMELY lenient (10 billion kJ/mol)
+        self.E_max_target = E_max  # Target E_max after warmup (100M)
+        self.E_max_initial = 1e12  # Start ultra-lenient (1 trillion kJ/mol)
         self.E_max = self.E_max_initial
         self.skip_threshold = skip_threshold
         self.log_warnings = log_warnings

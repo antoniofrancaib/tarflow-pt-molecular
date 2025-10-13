@@ -99,7 +99,7 @@ molecular_pt:
     use_energy: true  # Use OpenMM energy evaluation
     use_energy_gating: true  # Prevents gradient instability
     E_cut: 500.0  # Soft regularization threshold (kJ/mol)
-    E_max: 100000.0  # Hard clamp threshold after warmup (kJ/mol)
+    E_max: 100000000.0  # Hard clamp threshold after warmup (100M kJ/mol)
     
     training:
       epochs: 3000
@@ -132,7 +132,7 @@ molecular_pt:
     # Energy gating (for ablation studies)
     use_energy_gating: true  # ABLATION: Set false to disable
     E_cut: 500.0  # Soft regularization threshold (kJ/mol)
-    E_max: 100000.0  # Hard clamp threshold after warmup (kJ/mol)
+    E_max: 100000000.0  # Hard clamp threshold after warmup (100M kJ/mol)
     
     training:
       epochs: 3000
@@ -173,7 +173,7 @@ molecular_pt:
     use_energy: true
     use_energy_gating: true
     E_cut: 500.0
-    E_max: 100000.0  # Increased for better training stability
+    E_max: 100000000.0  # 100M kJ/mol for stability
     
     training:
       epochs: 3000
@@ -273,7 +273,7 @@ ablation_studies:
     use_energy: true
     use_energy_gating: true
     E_cut: 500.0
-    E_max: 100000.0
+    E_max: 100000000.0  # 100M kJ/mol
     training:
       epochs: 1500
       batch_size: 32  # Reduced for GPU memory safety
@@ -337,7 +337,7 @@ ablation_studies:
     use_energy: true
     use_energy_gating: true
     E_cut: 500.0
-    E_max: 100000.0
+    E_max: 100000000.0  # 100M kJ/mol
     training:
       epochs: 1500
       batch_size: 32  # Reduced for GPU memory safety
@@ -369,7 +369,7 @@ ablation_studies:
     use_energy: true
     use_energy_gating: true
     E_cut: 500.0
-    E_max: 100000.0
+    E_max: 100000000.0  # 100M kJ/mol
     training:
       epochs: 1500
       batch_size: 32  # Reduced for GPU memory safety
@@ -400,7 +400,7 @@ ablation_studies:
     use_energy: true
     use_energy_gating: true
     E_cut: 500.0
-    E_max: 100000.0
+    E_max: 100000000.0  # 100M kJ/mol
     training:
       epochs: 1500
       batch_size: 32  # Reduced for GPU memory safety
